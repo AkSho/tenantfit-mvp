@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+backend/frontend/node_modules/
+
+# Environment variables — never commit
+backend/.env
+backend/frontend/.env
+
+# Raw data files — too large for git
+backend/data/EPA_SmartLocationDatabase_V3_Jan_2021_Final.csv
+backend/data/2019_Food_Access_Research_Atlas_Data/
+
+# API cache — regenerates automatically
+backend/cache/
+
+# Debug output
+backend/verify_*.json
+backend/verify_logic*.json
+backend/verify_output*.json
+
+# Build artifacts (frontend builds in CI)
+backend/frontend/dist/
+
+# Codex artifacts
+.codex-artifacts/
+
+# macOS
+.DS_Store
