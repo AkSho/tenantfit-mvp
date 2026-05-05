@@ -656,7 +656,9 @@ async function generatePdf(inputData, resultData, targetConcept = null, docType 
     html = buildCombinedHtml(inputData, resultData, targetConcept);
   }
 
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
   const page    = await browser.newPage();
   try {
     await page.setContent(html, { waitUntil: 'networkidle' });
