@@ -130,7 +130,7 @@ const PROFILE_LABELS = {
 // TRADE AREA TRAJECTORY
 // Returns: 'growing' | 'stable' | 'declining'
 // ──────────────────────────────────────────
-function tradeAreaTrajectory(permits, blsData) {
+function tradeAreaTrajectory(permits, blsData, demographics) {
   let growthSignals = 0, declineSignals = 0;
 
   // Signal 1: Building permits
@@ -148,6 +148,14 @@ function tradeAreaTrajectory(permits, blsData) {
   const healthcare = blsData?.industries?.['62'];
   if (healthcare?.yoy_pct > 2)       growthSignals++;
   else if (healthcare?.yoy_pct < -2) declineSignals++;
+
+  // Signal 4: Census population growth (2018 → 2022)
+  const popGrowth = demographics?.pop_growth_pct;
+  if (popGrowth != null) {
+    if (popGrowth >= 5)       growthSignals++;
+    else if (popGrowth >= 2)  growthSignals += 0.5;
+    else if (popGrowth <= -2) declineSignals++;
+  }
 
   if (growthSignals >= 2)   return 'growing';
   if (declineSignals >= 1.5)return 'declining';
@@ -222,7 +230,7 @@ function runScoring({ sf, isVented, propertyType, leasingObjective, demographics
   const income   = demographics?.ring1?.median_income || demographics?.ring3?.median_income || 0;
   const aadt     = dotAadt?.aadt_count || 0;
   const profile  = psychographicProfile(demographics);
-  const trajectory = tradeAreaTrajectory(permits, blsData);
+  const trajectory = tradeAreaTrajectory(permits, blsData, demographics);
   const dtRatio  = daytimeRatio(lehd, demographics);
   const isOZ     = ozData?.oz_designated || false;
   const isFoodDesert = foodAccess?.food_desert || false;

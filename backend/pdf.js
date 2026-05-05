@@ -95,6 +95,7 @@ function buildLandlordBriefBody(inputData, resultData) {
     void_analysis, voidAnalysis, walkability,
     business_density, mapUrl, dot_aadt, permits,
     profile_label, trajectory_label,
+    consumer_spending, pop_growth_pct, pop_2018, pop_2022,
   } = resultData;
 
   const r1 = demographics?.ring1 || {};
@@ -218,11 +219,20 @@ function buildLandlordBriefBody(inputData, resultData) {
       <div class="source-note">Source: ${esc(business_density.source)}</div>
     </div>` : '';
 
-  // Permits / trajectory
-  const trajectoryBlock = (permits?.units_18mo || trajectory_label) ? `
+  // Permits / trajectory / population growth
+  const popGrowthDir  = pop_growth_pct > 0 ? '▲' : pop_growth_pct < 0 ? '▼' : '';
+  const popGrowthColor = pop_growth_pct >= 2 ? '#16a34a' : pop_growth_pct <= -2 ? '#dc2626' : '#374151';
+
+  const trajectoryBlock = (permits?.units_18mo || trajectory_label || pop_growth_pct != null) ? `
     <div style="margin-bottom:18px">
-      <div class="sec-hdr">Market Trajectory <span class="tag">Building Permits + BLS</span></div>
+      <div class="sec-hdr">Market Trajectory <span class="tag">Census + Building Permits + BLS</span></div>
       <div class="two-col">
+        ${pop_growth_pct != null ? `
+        <div class="stat-card">
+          <div class="lbl">County Population Growth (2018–2022)</div>
+          <div class="val" style="color:${popGrowthColor}">${popGrowthDir} ${Math.abs(pop_growth_pct)}%</div>
+          <div class="sub">${pop_2018 ? fmtN(pop_2018) + ' → ' + fmtN(pop_2022) : ''}</div>
+        </div>` : ''}
         ${permits?.units_18mo != null ? `
         <div class="stat-card">
           <div class="lbl">Residential Units Permitted (18 mo)</div>
@@ -235,6 +245,33 @@ function buildLandlordBriefBody(inputData, resultData) {
           <div class="val" style="font-size:13px">${esc(trajectory_label)}</div>
         </div>` : ''}
       </div>
+    </div>` : '';
+
+  // Consumer spending potential
+  const cs = consumer_spending;
+  const spendingBlock = cs ? `
+    <div style="margin-bottom:18px">
+      <div class="sec-hdr">Trade Area Spending Potential <span class="tag">BLS CE Survey 2022</span></div>
+      <div class="sub" style="margin-bottom:8px">Annual household spending estimates based on ${fmtN(cs.households)} households at ${fmt$(cs.median_hhi)} median income.</div>
+      <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+        <tr style="background:#1B2A4A;color:#fff">
+          <th style="padding:5px 8px;text-align:left">Category</th>
+          <th style="padding:5px 8px;text-align:right">Per Household / yr</th>
+          <th style="padding:5px 8px;text-align:right">Trade Area Total / yr</th>
+        </tr>
+        ${Object.keys(cs.labels).map((cat, i) => `
+        <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'}">
+          <td style="padding:4px 8px">${esc(cs.labels[cat])}</td>
+          <td style="padding:4px 8px;text-align:right">${fmt$(cs.per_household[cat])}</td>
+          <td style="padding:4px 8px;text-align:right;font-weight:600">${fmt$(cs.trade_area_total[cat])}</td>
+        </tr>`).join('')}
+        <tr style="background:#1B2A4A;color:#fff;font-weight:700">
+          <td style="padding:5px 8px">Total (all categories)</td>
+          <td style="padding:5px 8px;text-align:right">—</td>
+          <td style="padding:5px 8px;text-align:right">${fmt$(cs.total_annual_spend)}</td>
+        </tr>
+      </table>
+      <div class="source-note">Source: ${esc(cs.source)}</div>
     </div>` : '';
 
   return `
@@ -358,6 +395,7 @@ function buildLandlordBriefBody(inputData, resultData) {
 
   ${densityBlock}
   ${trajectoryBlock}
+  ${spendingBlock}
 
   <div class="disclaimer">
     <strong>Important:</strong> Tenant recommendations reflect demographic profile matches only.
@@ -387,6 +425,7 @@ function buildTenantPitchBody(inputData, resultData, targetConcept) {
     void_analysis, mapUrl, dot_aadt, permits,
     irs_soi, oz_data, food_access,
     profile_label, trajectory_label,
+    consumer_spending: cs2, pop_growth_pct: pg2, pop_2018: p18_2, pop_2022: p22_2,
   } = resultData;
 
   const r1   = demographics?.ring1 || {};
@@ -452,6 +491,20 @@ function buildTenantPitchBody(inputData, resultData, targetConcept) {
   }
   if (trajectory_label) {
     signals.push(`Trade area trajectory: ${trajectory_label}.`);
+  }
+  if (pg2 != null) {
+    const dir2 = pg2 > 0 ? 'grew' : 'declined';
+    signals.push(`County population ${dir2} ${Math.abs(pg2)}% between 2018 and 2022 (${fmtN(p18_2)} → ${fmtN(p22_2)}).`);
+  }
+  if (cs2) {
+    const catKey = conceptScore?.voidCategory === 'fitness' ? 'fitness_recreation'
+      : conceptScore?.voidCategory === 'grocery' ? 'food_at_home'
+      : 'food_away_from_home';
+    const spendTotal = cs2.trade_area_total[catKey];
+    const spendLabel = cs2.labels[catKey];
+    if (spendTotal) {
+      signals.push(`Trade area households spend an estimated ${fmt$(spendTotal)} annually on ${spendLabel.toLowerCase()} — based on ${fmtN(cs2.households)} households at ${fmt$(cs2.median_hhi)} median income (BLS CE Survey 2022).`);
+    }
   }
 
   // Score reasons for site qualification

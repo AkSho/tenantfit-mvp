@@ -219,22 +219,43 @@ async function getRing1Data(lat, lng) {
   return aggregateBlockGroups(allRows);
 }
 
-// ── County-level data (ring 3 / ring 5 proxy) ─────────────────────────────
+// ── County-level data (ring 3 / ring 5 proxy) + population trajectory ────────
 async function getCountyData(state, county) {
   const vars = 'B01003_001E,B11001_001E,B19013_001E,B01002_001E';
-  const url   = `https://api.census.gov/data/2022/acs/acs5?get=${vars}&for=county:${county}&in=state:${state}&key=${CENSUS_KEY}`;
-  const resp  = await axios.get(url, { timeout: 10000 });
-  if (!resp.data || resp.data.length < 2) return null;
 
-  const headers = resp.data[0];
-  const row     = resp.data[1];
+  const [resp2022, resp2018] = await Promise.allSettled([
+    axios.get(`https://api.census.gov/data/2022/acs/acs5?get=${vars}&for=county:${county}&in=state:${state}&key=${CENSUS_KEY}`, { timeout: 10000 }),
+    axios.get(`https://api.census.gov/data/2018/acs/acs5?get=B01003_001E&for=county:${county}&in=state:${state}&key=${CENSUS_KEY}`, { timeout: 10000 }),
+  ]);
+
+  if (resp2022.status !== 'fulfilled' || !resp2022.value.data || resp2022.value.data.length < 2) return null;
+
+  const headers = resp2022.value.data[0];
+  const row     = resp2022.value.data[1];
   const n = (k) => { const i = headers.indexOf(k); const v = parseInt(row[i]); return (v < 0 || isNaN(v)) ? 0 : v; };
 
+  const pop2022 = n('B01003_001E');
+  let pop2018 = null, popGrowthPct = null;
+
+  if (resp2018.status === 'fulfilled' && resp2018.value.data?.length >= 2) {
+    const h18 = resp2018.value.data[0];
+    const r18 = resp2018.value.data[1];
+    const idx = h18.indexOf('B01003_001E');
+    const v   = parseInt(r18[idx]);
+    if (v > 0) {
+      pop2018      = v;
+      popGrowthPct = +((pop2022 - v) / v * 100).toFixed(1);
+    }
+  }
+
   return {
-    population:    n('B01003_001E'),
-    households:    n('B11001_001E'),
-    median_income: n('B19013_001E') || null,
-    median_age:    parseFloat(row[headers.indexOf('B01002_001E')]) || null,
+    population:       pop2022,
+    households:       n('B11001_001E'),
+    median_income:    n('B19013_001E') || null,
+    median_age:       parseFloat(row[headers.indexOf('B01002_001E')]) || null,
+    pop_2018:         pop2018,
+    pop_2022:         pop2022,
+    pop_growth_pct:   popGrowthPct,
   };
 }
 
@@ -267,6 +288,9 @@ async function fetchDemographics(lat, lng) {
     ring3: county,
     ring5: county,
     fips,
+    pop_growth_pct:  county?.pop_growth_pct  ?? null,
+    pop_2018:        county?.pop_2018        ?? null,
+    pop_2022:        county?.pop_2022        ?? null,
     source: 'Census ACS 5-Year (2022) — 1-mile radius aggregation',
   };
 

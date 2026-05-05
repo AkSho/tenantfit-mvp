@@ -18,6 +18,7 @@ const { fetchBLSQCEW }               = require('./lib/bls-qcew');
 const { fetchEpaSmartLocation }      = require('./lib/epa-smart-location');
 const { computeWalkability }         = require('./lib/walkability');
 const { runScoring }                 = require('./lib/scoring');
+const { computeConsumerSpending }    = require('./lib/bls-consumer-spending');
 
 const app = express();
 app.use(cors());
@@ -235,7 +236,14 @@ app.post('/api/report', async (req, res) => {
       foodAccess,
     });
 
-    // 5. Metrics object (frontend-compat)
+    // 5. Consumer spending lookup (pure computation — no latency)
+    const ring1pop = demographics?.ring1;
+    const consumerSpending = computeConsumerSpending(
+      ring1pop?.median_income,
+      ring1pop?.households
+    );
+
+    // 6. Metrics object (frontend-compat)
     const ring1 = demographics?.ring1;
     const metrics = {
       population:     ring1?.population         || null,
@@ -277,8 +285,12 @@ app.post('/api/report', async (req, res) => {
       oz_data:       ozData,
       irs_soi:       irsSoiData,
       walkability,
-      business_density: businessDensity,
-      mapUrl:        mapUrlValue,
+      business_density:  businessDensity,
+      consumer_spending: consumerSpending,
+      pop_growth_pct:    demographics?.pop_growth_pct ?? null,
+      pop_2018:          demographics?.pop_2018       ?? null,
+      pop_2022:          demographics?.pop_2022       ?? null,
+      mapUrl:            mapUrlValue,
     });
 
   } catch (err) {
