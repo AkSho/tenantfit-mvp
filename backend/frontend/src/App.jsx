@@ -233,7 +233,10 @@ const ReportView = ({ inputData, resultData, onBack }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inputData, resultData, targetConcept, docType }),
       });
-      if (!res.ok) throw new Error('failed');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || 'failed');
+      }
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
@@ -242,7 +245,7 @@ const ReportView = ({ inputData, resultData, onBack }) => {
       a.download = `tenantfit-${docType}-${slug}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch { alert('PDF generation failed. Is the server running?'); }
+    } catch (e) { alert('PDF generation failed: ' + (e?.message || 'unknown error')); }
     finally { setLoading(false); }
   };
 

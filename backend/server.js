@@ -317,8 +317,8 @@ app.post('/api/pdf', async (req, res) => {
     });
     res.send(pdfBuffer);
   } catch (err) {
-    console.error('[PDF] Error:', err);
-    res.status(500).json({ error: 'PDF generation failed' });
+    console.error('[PDF] Error:', err?.message, err?.stack);
+    res.status(500).json({ error: 'PDF generation failed', detail: err?.message });
   }
 });
 
